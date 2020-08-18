@@ -19,6 +19,7 @@ impl Value {
 pub struct ChunkBuilder {
     name: String,
     code: Vec<Op>,
+    lines: Vec<usize>,
     constants: Vec<Value>,
 }
 
@@ -34,17 +35,20 @@ impl ChunkBuilder {
         Chunk {
             name: self.name,
             code: self.code,
+            lines: self.lines,
             constants: self.constants,
         }
     }
 
-    pub fn op_return(mut self) -> Self {
+    pub fn op_return(mut self, line: usize) -> Self {
         self.code.push(Op::Return);
+        self.lines.push(line);
         self
     }
 
-    pub fn op_constant(mut self, value: Value) -> Self {
+    pub fn op_constant(mut self, line: usize, value: Value) -> Self {
         self.code.push(Op::Constant(self.constants.len()));
+        self.lines.push(line);
         self.constants.push(value);
         self
     }
@@ -53,6 +57,7 @@ impl ChunkBuilder {
 pub struct Chunk {
     name: String,
     code: Vec<Op>,
+    lines: Vec<usize>,
     constants: Vec<Value>,
 }
 
@@ -68,8 +73,8 @@ impl Chunk {
     pub fn disassemble(&self) -> String {
         let mut disassembly = Vec::new();
 
-        for (num, opcode) in self.code.iter().enumerate() {
-            disassembly.push(format!("{:0<4} {}", num, self.disassemble_op(opcode)));
+        for (num, (op, line)) in self.code.iter().zip(self.lines.iter()).enumerate(){
+            disassembly.push(format!("{: >4} {:0>4} {}", line, num, self.disassemble_op(op)));
         }
 
         disassembly.join("\n")
@@ -78,7 +83,7 @@ impl Chunk {
     fn disassemble_op(&self, op: &Op) -> String {
         match op {
             Op::Return => format!("{:?}", op),
-            Op::Constant(index) => format!("{:?} {:?}", op, self.get_constant(*index).unwrap()),
+            Op::Constant(index) => format!("{:?} {:?}", op, self.constants.get(*index).unwrap())
         }
     }
 }

@@ -7,8 +7,8 @@ mod chunk;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let chunk = Chunk::builder("Test chunk")
-        .op_constant(Value::new(1.2))
-        .op_return()
+        .op_constant(3, Value::new(1.2))
+        .op_return(4)
         .build();
 
     println!("{:?}", chunk);
