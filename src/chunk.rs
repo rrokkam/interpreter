@@ -70,20 +70,29 @@ impl Chunk {
         Some(*self.constants.get(index)?)
     }
 
+    pub fn code(&self, index: usize) -> Option<Op> {
+        Some(*self.code.get(index)?)
+    }
+
     pub fn disassemble(&self) -> String {
         let mut disassembly = Vec::new();
 
-        for (num, (op, line)) in self.code.iter().zip(self.lines.iter()).enumerate(){
-            disassembly.push(format!("{: >4} {:0>4} {}", line, num, self.disassemble_op(op)));
+        for (num, (op, line)) in self.code.iter().zip(self.lines.iter()).enumerate() {
+            disassembly.push(format!(
+                "{: >4} {:0>4} {}",
+                line,
+                num,
+                self.disassemble_op(op)
+            ));
         }
 
         disassembly.join("\n")
     }
 
-    fn disassemble_op(&self, op: &Op) -> String {
+    pub fn disassemble_op(&self, op: &Op) -> String {
         match op {
             Op::Return => format!("{:?}", op),
-            Op::Constant(index) => format!("{:?} {:?}", op, self.constants.get(*index).unwrap())
+            Op::Constant(index) => format!("{:?} {:?}", op, self.constants.get(*index).unwrap()),
         }
     }
 }

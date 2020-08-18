@@ -1,11 +1,10 @@
 use crate::chunk::{Chunk, Value};
-//use crate::vm::VM;
-use std::error::Error;
+use crate::vm::{InterpretError, VM};
 
 mod chunk;
-//mod vm;
+mod vm;
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), InterpretError> {
     let chunk = Chunk::builder("Test chunk")
         .op_constant(3, Value::new(1.2))
         .op_return(4)
@@ -13,7 +12,5 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("{:?}", chunk);
 
-    //    let mut vm = VM::new(chunk);
-    //    vm.interpret()?;
-    Ok(())
+    VM::new(chunk).interpret()
 }

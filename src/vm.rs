@@ -1,24 +1,14 @@
 use crate::chunk::{Chunk, Op, Value};
-use std::error::Error;
-use std::fmt::{self, Display};
 
 #[derive(Debug)]
 pub enum InterpretError {
-    //    CompileTime,
-    RunTime,
+    //    Compile,
+    Runtime,
 }
-
-impl Display for InterpretError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(f, "{:?}", self)
-    }
-}
-
-impl Error for InterpretError {}
 
 pub struct VM {
     chunk: Chunk,
-    ip: u8,
+    ip: usize,
     value_stack: Vec<Value>,
 }
 
@@ -33,27 +23,41 @@ impl VM {
 
     pub fn interpret(&mut self) -> Result<(), InterpretError> {
         loop {
-            match self.next_instruction() {
-                Op::Return => {
-                    // Debug printout for when we return from a function.
-                    println!(
-                        "{:?}",
-                        self.value_stack.pop().ok_or(InterpretError::RunTime)?
-                    );
-                    return Ok(());
-                }
-                Op::Constant(index) => {
-                    self.value_stack.push(
-                        self.chunk
-                            .get_constant(index)
-                            .ok_or(InterpretError::RunTime)?,
-                    );
-                }
+            let instruction = self.next_instruction()?;
+
+            //#[cfg(debug)]
+            {
+                self.chunk.disassemble_op(&instruction);
+                println!("{:?}", self.value_stack);
+            }
+            match instruction {
+                Op::Return => return self.op_return(),
+                Op::Constant(index) => self.op_constant(index)?,
             }
         }
     }
 
-    fn next_instruction(&self) -> Op {
-        Op::Return
+    fn op_return(&mut self) -> Result<(), InterpretError> {
+        println!(
+            "Returning {:?}",
+            self.value_stack.pop().ok_or(InterpretError::Runtime)?
+        );
+        Ok(())
+    }
+
+    fn op_constant(&mut self, index: usize) -> Result<(), InterpretError> {
+        self.value_stack.push(
+            self.chunk
+                .get_constant(index)
+                .ok_or(InterpretError::Runtime)?,
+        );
+        println!("op_constant {:?}", self.chunk.get_constant(index).unwrap());
+        Ok(())
+    }
+
+    fn next_instruction(&mut self) -> Result<Op, InterpretError> {
+        let op = self.chunk.code(self.ip).ok_or(InterpretError::Runtime)?;
+        self.ip += 1;
+        Ok(op)
     }
 }
