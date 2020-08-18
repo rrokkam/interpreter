@@ -33,6 +33,7 @@ impl VM {
             match instruction {
                 Op::Return => return self.op_return(),
                 Op::Constant(index) => self.op_constant(index)?,
+                Op::Negate => self.op_negate()?,
             }
         }
     }
@@ -53,6 +54,11 @@ impl VM {
         );
         println!("op_constant {:?}", self.chunk.get_constant(index).unwrap());
         Ok(())
+    }
+
+    fn op_negate(&mut self) -> Result<(), InterpretError> {
+        let value = self.value_stack.pop().ok_or(InterpretError::Runtime)?;
+        Ok(self.value_stack.push(-value))
     }
 
     fn next_instruction(&mut self) -> Result<Op, InterpretError> {

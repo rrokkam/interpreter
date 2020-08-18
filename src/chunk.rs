@@ -4,6 +4,7 @@ use std::fmt::{self, Debug};
 pub enum Op {
     Return,
     Constant(usize),
+    Negate,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -12,6 +13,14 @@ pub struct Value(f64);
 impl Value {
     pub fn new(value: f64) -> Self {
         Value(value)
+    }
+}
+
+impl std::ops::Neg for Value {
+    type Output = Value;
+
+    fn neg(self) -> Self::Output {
+        Value::new(-self.0)
     }
 }
 
@@ -50,6 +59,12 @@ impl ChunkBuilder {
         self.code.push(Op::Constant(self.constants.len()));
         self.lines.push(line);
         self.constants.push(value);
+        self
+    }
+
+    pub fn op_negate(mut self, line: usize) -> Self {
+        self.code.push(Op::Negate);
+        self.lines.push(line);
         self
     }
 }
@@ -91,7 +106,7 @@ impl Chunk {
 
     pub fn disassemble_op(&self, op: &Op) -> String {
         match op {
-            Op::Return => format!("{:?}", op),
+            Op::Return | Op::Negate => format!("{:?}", op),
             Op::Constant(index) => format!("{:?} {:?}", op, self.constants.get(*index).unwrap()),
         }
     }
