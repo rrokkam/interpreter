@@ -2,7 +2,7 @@ use crate::chunk::{Chunk, Op, Value};
 
 #[derive(Debug)]
 pub enum InterpretError {
-    //    Compile,
+    Compile,
     Runtime,
 }
 
