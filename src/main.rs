@@ -1,9 +1,12 @@
+#![feature(peekable_next_if)]
+
 use crate::chunk::{Chunk, Value};
 use crate::vm::{InterpretError, VM};
 use std::fs;
 use std::io::{self, BufRead, Write};
 
 mod chunk;
+mod compiler;
 mod vm;
 
 fn main() -> Result<(), std::io::Error> {
@@ -31,7 +34,9 @@ fn repl() -> Result<(), std::io::Error> {
 }
 
 fn run_file(filename: &str) -> Result<(), std::io::Error> {
-    let source = fs::read_to_string(filename).map_err(|_| std::process::exit(74)).unwrap();
+    let source = fs::read_to_string(filename)
+        .map_err(|_| std::process::exit(74))
+        .unwrap();
     interpret(source).map_err(|err| match err {
         InterpretError::Compile => std::process::exit(65),
         InterpretError::Runtime => std::process::exit(70),
