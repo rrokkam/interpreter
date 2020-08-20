@@ -1,5 +1,8 @@
+use std::str::Chars;
+
+//#[allow(dead_code)]
 #[derive(Debug)]
-enum TokenType {
+enum Token<'a> {
     // Single-character tokens.
     LeftParen,
     RightParen,
@@ -25,9 +28,9 @@ enum TokenType {
     LessEqual,
 
     // Literals.
-    Identifier,
-    String,
-    Number,
+    Identifier(&'a str),
+    String(&'a str),
+    Number(&'a str),
 
     // Keywords.
     And,
@@ -47,121 +50,170 @@ enum TokenType {
     Var,
     While,
 
-    Error,
-}
-
-struct Token<'a> {
-    token_type: TokenType,
-    token: &'a str,
-    line: usize,
-    start: usize,
+    Illegal,
 }
 
 struct Tokens<'a> {
-    iter: std::iter::Peekable<std::str::Chars<'a>>,
-    line: usize,
-}
-
-impl<'a> Tokens<'a> {
-    fn skip_whitespace(&mut self) -> Option<()> {
-        loop {
-            let next = *self.iter.peek()?;
-            if next == ' ' || next == '\t' || next == '\r' {
-                self.iter.next()?;
-            } else if next == '\n' {
-                self.iter.next()?;
-                self.line += 1;
-            } else if next == '#' {
-                loop {
-                    if self.iter.next_if_eq(&'\n').is_some() {
-                        break;
-                    }
-                }
-            } else {
-                break;
-            }
-        }
-        Some(())
-    }
-
-    fn string(&mut self) -> Option<Token<'a>> {
-        while *self.iter.peek().ok_or_else(|| return TokenType::Error).unwrap() != '"' {
-            let next = *self.iter.peek()?;
-            if next == '\n' {
-                self.line += 1;
-            }
-
-            // Unterminated string
-            self.iter.next().ok_or_else(|| return TokenType::Error).unwrap();
-        }
-        Some(Token { token_type: TokenType::String, token: "", line: 0, start: 0 } )
-    }
-
-    fn number(&mut self) -> Option<Token<'a>> {
-        unimplemented!()
-    }
+    chars: Chars<'a>,
 }
 
 impl<'a> From<&'a str> for Tokens<'a> {
     fn from(source: &'a str) -> Tokens<'a> {
         Tokens {
-            iter: source.chars().peekable(),
-            line: 1,
+            chars: source.chars(),
+        }
+    }
+}
+
+impl<'a> Tokens<'a> {
+    fn consume(&mut self) -> Option<char> {
+        self.chars.next()
+    }
+
+    fn consume_if_eq(&mut self, c: char) -> bool {
+        match self.peek() {
+            Some(n) if c == n => {
+                self.chars.next().unwrap();
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn peek(&self) -> Option<char> {
+        self.chars.clone().next()
+    }
+
+    fn peek_next(&self) -> Option<char> {
+        self.chars.clone().nth(1)
+    }
+
+    fn source(&self) -> &'a str {
+        self.chars.as_str()
+    }
+
+    fn finished(&self) -> bool {
+        self.chars.as_str().is_empty()
+    }
+
+    fn identifier(&mut self, first: char) -> Token<'a> {
+        loop {
+            match self.peek() {
+                Some(c) if c.is_alphabetic() => {
+                    self.consume().unwrap();
+                }
+                Some(_) => {
+                    self.consume().unwrap();
+                    return Token::Identifier("");
+                },
+                None => return Token::Identifier(""),
+            }
+        }
+    }
+
+    fn string(&mut self) -> Token<'a> {
+        let source = self.source();
+        let length = 0;
+        loop {
+            match self.peek() {
+                Some('"') => {
+                    self.consume().unwrap();
+                    return Token::String("");
+                }
+                Some(_) => {
+                    self.consume().unwrap();
+                },
+                // unterminated string
+                None => return Token::Illegal,
+            }
+        }
+    }
+
+    fn number(&mut self, first: char) -> Token<'a> {
+        loop {
+            match self.peek() {
+                Some('"') => {
+                    self.consume().unwrap();
+                    return Token::String("");
+                }
+                Some(_) => {
+                    self.consume().unwrap();
+                },
+                // unterminated string
+                None => return Token::Illegal,
+            }
+        }
+   }
+
+    fn skip_whitespace_and_comments(&mut self) {
+        loop {
+            match self.peek() {
+                Some(c) if c.is_whitespace() => {
+                    self.consume().unwrap();
+                }
+                Some('#') => self.skip_line(),
+                _ => break,
+            };
+        }
+    }
+
+    fn skip_line(&mut self) {
+        loop {
+            let c = self.consume();
+            match c {
+                Some(c) if c == '\n' => break,
+                _ => (),
+            }
         }
     }
 }
 
 impl<'a> Iterator for Tokens<'a> {
     type Item = Token<'a>;
-
     fn next(&mut self) -> Option<Token<'a>> {
-        self.skip_whitespace()?;
+        self.skip_whitespace_and_comments();
 
-        let token_type = match self.iter.next()? {
-            '(' => TokenType::LeftParen,
-            ')' => TokenType::RightParen,
-            '{' => TokenType::LeftBrace,
-            '}' => TokenType::RightBrace,
-            ';' => TokenType::Semicolon,
-            ',' => TokenType::Comma,
-            '.' => TokenType::Dot,
-            '-' => TokenType::Minus,
-            '+' => TokenType::Plus,
-            '/' => TokenType::Slash,
-            '*' => TokenType::Star,
-            '#' => TokenType::Pound,
-            '!' if self.iter.next_if_eq(&'=').is_some() => TokenType::BangEqual,
-            '!' => TokenType::Bang,
-            '=' if self.iter.next_if_eq(&'=').is_some() => TokenType::EqualEqual,
-            '=' => TokenType::Equal,
-            '<' if self.iter.next_if_eq(&'=').is_some() => TokenType::LessEqual,
-            '<' => TokenType::Less,
-            '>' if self.iter.next_if_eq(&'=').is_some() => TokenType::GreaterEqual,
-            '>' => TokenType::Greater,
-            '"' => return self.string(),
-            num if num >= '0' && num <= '9' => return self.number(),
-            _ => TokenType::Error,
+        let token = match self.consume()? {
+            '(' => Token::LeftParen,
+            ')' => Token::RightParen,
+            '{' => Token::LeftBrace,
+            '}' => Token::RightBrace,
+            ';' => Token::Semicolon,
+            ',' => Token::Comma,
+            '.' => Token::Dot,
+            '-' => Token::Minus,
+            '+' => Token::Plus,
+            '/' => Token::Slash,
+            '*' => Token::Star,
+            '#' => Token::Pound,
+            '!' if self.consume_if_eq('=') => Token::BangEqual,
+            '!' => Token::Bang,
+            '=' if self.consume_if_eq('=') => Token::EqualEqual,
+            '=' => Token::Equal,
+            '<' if self.consume_if_eq('=') => Token::LessEqual,
+            '<' => Token::Less,
+            '>' if self.consume_if_eq('=') => Token::GreaterEqual,
+            '>' => Token::Greater,
+            '"' => self.string(),
+            c @ '0'..='9' => self.number(c),
+            c @ 'a'..='z' | c @ 'A'..='Z' => self.identifier(c),
+            _ => Token::Illegal,
         };
-        Some(Token {
-            token_type,
-            token: "",
-            line: 0,
-            start: 0,
-        })
+        Some(token)
     }
 }
 
 pub fn compile(source: &str) {
     let tokens = Tokens::from(source);
-    let mut prev_line = 0;
+    //    let mut prev_line = 0;
 
     for token in tokens {
-        if token.line == prev_line {
-            print!("{:>4} ", token.line);
-        } else {
-            print!("   | ");
-        }
-        println!("{:?} {}", token.token_type, token.token);
-        prev_line = token.line;
+        //        if token.line == prev_line {
+        //            print!("{:>4} ", token.line);
+        //        } else {
+        //            print!("   | ");
+        //        }
+        println!("{:?}", token);
+        //        prev_line = token.line;
     }
 }

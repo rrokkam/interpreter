@@ -29,7 +29,7 @@ fn repl() -> Result<(), std::io::Error> {
         print!("> ");
         stdout.flush()?;
     }
-    println!("");
+    println!();
     Ok(())
 }
 
