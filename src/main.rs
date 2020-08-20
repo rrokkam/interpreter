@@ -6,7 +6,7 @@ use std::fs;
 use std::io::{self, BufRead, Write};
 
 mod chunk;
-mod compiler;
+mod lexer;
 mod vm;
 
 fn main() -> Result<(), std::io::Error> {
