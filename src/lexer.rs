@@ -1,170 +1,114 @@
+use std::iter::Peekable;
 use std::str::Chars;
 
-//#[allow(dead_code)]
-#[derive(Debug)]
-enum Token<'a> {
-    // Single-character tokens.
-    LeftParen,
-    RightParen,
-    LeftBrace,
-    RightBrace,
-    Comma,
-    Dot,
-    Minus,
-    Plus,
-    Semicolon,
-    Slash,
-    Star,
-    Pound,
+#[derive(Debug, PartialEq, Eq)]
+struct Token<'a> {
+    kind: Kind,
+    text: &'a str,
+}
 
-    // One or two character tokens.
-    Bang,
-    BangEqual,
-    Equal,
-    EqualEqual,
-    Greater,
-    GreaterEqual,
-    Less,
-    LessEqual,
+impl<'a> Token<'a> {
+    fn new(kind: Kind, text: &'a str) -> Token<'a> {
+        Token { kind, text }
+    }
+}
 
-    // Literals.
-    Identifier(&'a str),
-    String(&'a str),
-    Number(&'a str),
-
-    // Keywords.
-    And,
-    Class,
-    Else,
-    False,
-    For,
-    Fun,
-    If,
-    Nil,
-    Or,
-    Print,
-    Return,
-    Super,
-    This,
-    True,
-    Var,
-    While,
-
-    Illegal,
+#[rustfmt::skip]
+#[derive(Debug, PartialEq, Eq)]
+enum Kind {
+    LeftParen, RightParen, LeftBrace, RightBrace, Comma, Dot, Minus, Plus, Semicolon, Slash, Star, Pound,
+    Bang, BangEqual, Equal, EqualEqual, Greater, GreaterEqual, Less, LessEqual,
+    Identifier, String, Number,
+    And, Class, Else, False, For, Fun, If, Nil, Or, Print, Return, Super, This, True, Var, While,
+    Error,
 }
 
 struct Tokens<'a> {
-    chars: Chars<'a>,
+    source: &'a str,
+    iter: Peekable<Chars<'a>>,
+    start: usize,
+    current: usize,
 }
 
 impl<'a> From<&'a str> for Tokens<'a> {
     fn from(source: &'a str) -> Tokens<'a> {
         Tokens {
-            chars: source.chars(),
+            source,
+            iter: source.chars().peekable(),
+            start: 0,
+            current: 0,
         }
     }
 }
 
 impl<'a> Tokens<'a> {
-    fn consume(&mut self) -> Option<char> {
-        self.chars.next()
-    }
+    fn advance(&mut self) -> Option<char> {
+        let ch = self.iter.next();
 
-    fn consume_if_eq(&mut self, c: char) -> bool {
-        match self.peek() {
-            Some(n) if c == n => {
-                self.chars.next().unwrap();
-                true
-            }
-            _ => false,
+        // https://wduquette.github.io/parsing-strings-into-slices/
+        if let Some(c) = ch {
+            self.current += c.len_utf8();
         }
+
+        ch
     }
 
-    fn peek(&self) -> Option<char> {
-        self.chars.clone().next()
-    }
-
-    fn peek_next(&self) -> Option<char> {
-        self.chars.clone().nth(1)
-    }
-
-    fn source(&self) -> &'a str {
-        self.chars.as_str()
-    }
-
-    fn finished(&self) -> bool {
-        self.chars.as_str().is_empty()
-    }
-
-    fn identifier(&mut self, first: char) -> Token<'a> {
+    fn advance_while(&mut self, mut func: impl FnMut(char) -> bool) {
         loop {
-            match self.peek() {
-                Some(c) if c.is_alphabetic() => {
-                    self.consume().unwrap();
+            match self.iter.peek() {
+                Some(&c) if func(c) => {
+                    self.advance().unwrap();
                 }
-                Some(_) => {
-                    self.consume().unwrap();
-                    return Token::Identifier("");
-                },
-                None => return Token::Identifier(""),
+                _ => return,
             }
         }
     }
 
-    fn string(&mut self) -> Token<'a> {
-        let source = self.source();
-        let length = 0;
-        loop {
-            match self.peek() {
-                Some('"') => {
-                    self.consume().unwrap();
-                    return Token::String("");
-                }
-                Some(_) => {
-                    self.consume().unwrap();
-                },
-                // unterminated string
-                None => return Token::Illegal,
+    fn matches(&mut self, expected: char, kind: Kind) -> Option<Kind> {
+        match self.iter.peek()? {
+            c if *c == expected => {
+                self.advance().unwrap();
+                Some(kind)
             }
+            _ => None,
         }
     }
 
-    fn number(&mut self, first: char) -> Token<'a> {
-        loop {
-            match self.peek() {
-                Some('"') => {
-                    self.consume().unwrap();
-                    return Token::String("");
-                }
-                Some(_) => {
-                    self.consume().unwrap();
-                },
-                // unterminated string
-                None => return Token::Illegal,
-            }
+    fn identifier(&mut self) -> Kind {
+        self.advance_while(|c| c.is_alphabetic());
+        Kind::Identifier
+    }
+
+    fn string(&mut self) -> Kind {
+        self.advance_while(|c| c != '"');
+        if let Some('"') = self.advance() {
+            Kind::String
+        } else {
+            Kind::Error
         }
-   }
+    }
+
+    fn number(&mut self) -> Kind {
+        self.advance_while(|c| c.is_numeric());
+        Kind::Number
+    }
 
     fn skip_whitespace_and_comments(&mut self) {
         loop {
-            match self.peek() {
+            match self.iter.peek() {
                 Some(c) if c.is_whitespace() => {
-                    self.consume().unwrap();
+                    self.advance().unwrap();
                 }
                 Some('#') => self.skip_line(),
                 _ => break,
             };
         }
+        self.start = self.current;
     }
 
     fn skip_line(&mut self) {
-        loop {
-            let c = self.consume();
-            match c {
-                Some(c) if c == '\n' => break,
-                _ => (),
-            }
-        }
+        self.advance_while(|c| c != '\n');
+        self.advance().unwrap();
     }
 }
 
@@ -173,47 +117,55 @@ impl<'a> Iterator for Tokens<'a> {
     fn next(&mut self) -> Option<Token<'a>> {
         self.skip_whitespace_and_comments();
 
-        let token = match self.consume()? {
-            '(' => Token::LeftParen,
-            ')' => Token::RightParen,
-            '{' => Token::LeftBrace,
-            '}' => Token::RightBrace,
-            ';' => Token::Semicolon,
-            ',' => Token::Comma,
-            '.' => Token::Dot,
-            '-' => Token::Minus,
-            '+' => Token::Plus,
-            '/' => Token::Slash,
-            '*' => Token::Star,
-            '#' => Token::Pound,
-            '!' if self.consume_if_eq('=') => Token::BangEqual,
-            '!' => Token::Bang,
-            '=' if self.consume_if_eq('=') => Token::EqualEqual,
-            '=' => Token::Equal,
-            '<' if self.consume_if_eq('=') => Token::LessEqual,
-            '<' => Token::Less,
-            '>' if self.consume_if_eq('=') => Token::GreaterEqual,
-            '>' => Token::Greater,
+        let kind = match self.advance()? {
+            '(' => Kind::LeftParen,
+            ')' => Kind::RightParen,
+            '{' => Kind::LeftBrace,
+            '}' => Kind::RightBrace,
+            ';' => Kind::Semicolon,
+            ',' => Kind::Comma,
+            '.' => Kind::Dot,
+            '-' => Kind::Minus,
+            '+' => Kind::Plus,
+            '/' => Kind::Slash,
+            '*' => Kind::Star,
+            '#' => Kind::Pound,
+            '!' => self.matches('=', Kind::BangEqual).unwrap_or(Kind::Bang),
+            '=' => self.matches('=', Kind::EqualEqual).unwrap_or(Kind::Equal),
+            '<' => self.matches('=', Kind::LessEqual).unwrap_or(Kind::Less),
+            '>' => self
+                .matches('=', Kind::GreaterEqual)
+                .unwrap_or(Kind::Greater),
             '"' => self.string(),
-            c @ '0'..='9' => self.number(c),
-            c @ 'a'..='z' | c @ 'A'..='Z' => self.identifier(c),
-            _ => Token::Illegal,
+            '0'..='9' => self.number(),
+            'a'..='z' | 'A'..='Z' => self.identifier(),
+            _ => Kind::Error,
         };
-        Some(token)
+
+        let text = &self.source[self.start..self.current];
+        self.start = self.current;
+
+        Some(Token::new(kind, text))
     }
 }
 
 pub fn compile(source: &str) {
-    let tokens = Tokens::from(source);
-    //    let mut prev_line = 0;
-
-    for token in tokens {
-        //        if token.line == prev_line {
-        //            print!("{:>4} ", token.line);
-        //        } else {
-        //            print!("   | ");
-        //        }
+    for token in Tokens::from(source) {
         println!("{:?}", token);
-        //        prev_line = token.line;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn some_tokens() {
+        let source = " my ( < != ";
+        let mut tokens = Tokens::from(source);
+        assert_eq!(tokens.next().unwrap(), Token { kind: Kind::Identifier, text: "my" });
+        assert_eq!(tokens.next().unwrap(), Token { kind: Kind::LeftParen, text: "(" });
+        assert_eq!(tokens.next().unwrap(), Token { kind: Kind::Less, text: "<" });
+        assert_eq!(tokens.next().unwrap(), Token { kind: Kind::BangEqual, text: "!=" });
     }
 }
