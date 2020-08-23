@@ -32,9 +32,10 @@ struct Tokens<'a> {
 
 impl<'a> From<&'a str> for Tokens<'a> {
     fn from(source: &'a str) -> Tokens<'a> {
+        let iter = source.chars().peekable();
         Tokens {
             source,
-            iter: source.chars().peekable(),
+            iter,
             start: 0,
             current: 0,
         }
@@ -163,9 +164,10 @@ mod tests {
     fn some_tokens() {
         let source = " my ( < != ";
         let mut tokens = Tokens::from(source);
-        assert_eq!(tokens.next().unwrap(), Token { kind: Kind::Identifier, text: "my" });
-        assert_eq!(tokens.next().unwrap(), Token { kind: Kind::LeftParen, text: "(" });
-        assert_eq!(tokens.next().unwrap(), Token { kind: Kind::Less, text: "<" });
-        assert_eq!(tokens.next().unwrap(), Token { kind: Kind::BangEqual, text: "!=" });
+        assert_eq!(tokens.next(), Some(Token::new(Kind::Identifier, "my")));
+        assert_eq!(tokens.next(), Some(Token::new(Kind::LeftParen, "(")));
+        assert_eq!(tokens.next(), Some(Token::new(Kind::Less, "<")));
+        assert_eq!(tokens.next(), Some(Token::new(Kind::BangEqual, "!=")));
+        assert_eq!(tokens.next(), None);
     }
 }
