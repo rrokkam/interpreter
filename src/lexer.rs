@@ -2,7 +2,7 @@ use std::iter::Peekable;
 use std::str::Chars;
 
 #[derive(Debug, PartialEq, Eq)]
-struct Token<'source> {
+pub struct Token<'source> {
     kind: Kind,
     text: &'source str,
 }
@@ -23,7 +23,7 @@ enum Kind {
     Error,
 }
 
-struct Tokens<'source> {
+pub struct Tokens<'source> {
     source: &'source str,
     iter: Peekable<Chars<'source>>,
     start: usize,
@@ -94,9 +94,8 @@ impl<'source> Tokens<'source> {
             "true" => Kind::True,
             "var" => Kind::Var,
             "while" => Kind::While,
-            _ => Kind::Identifier
+            _ => Kind::Identifier,
         }
-
     }
 
     fn string(&mut self) -> Kind {
@@ -166,12 +165,6 @@ impl<'source> Iterator for Tokens<'source> {
         self.start = self.current;
 
         Some(Token::new(kind, text))
-    }
-}
-
-pub fn compile(source: &str) {
-    for token in Tokens::from(source) {
-        println!("{:?}", token);
     }
 }
 
