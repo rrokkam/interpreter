@@ -75,9 +75,28 @@ impl<'a> Tokens<'a> {
         }
     }
 
-    fn identifier(&mut self) -> Kind {
+    fn identifier_or_keyword(&mut self) -> Kind {
         self.advance_while(|c| c.is_alphabetic());
-        Kind::Identifier
+        match &self.source[self.start..self.current] {
+            "and" => Kind::And,
+            "class" => Kind::Class,
+            "else" => Kind::Else,
+            "false" => Kind::False,
+            "for" => Kind::For,
+            "fun" => Kind::Fun,
+            "if" => Kind::If,
+            "nil" => Kind::Nil,
+            "or" => Kind::Or,
+            "print" => Kind::Print,
+            "return" => Kind::Return,
+            "super" => Kind::Super,
+            "this" => Kind::This,
+            "true" => Kind::True,
+            "var" => Kind::Var,
+            "while" => Kind::While,
+            _ => Kind::Identifier
+        }
+
     }
 
     fn string(&mut self) -> Kind {
@@ -139,7 +158,7 @@ impl<'a> Iterator for Tokens<'a> {
                 .unwrap_or(Kind::Greater),
             '"' => self.string(),
             '0'..='9' => self.number(),
-            'a'..='z' | 'A'..='Z' => self.identifier(),
+            'a'..='z' | 'A'..='Z' => self.identifier_or_keyword(),
             _ => Kind::Error,
         };
 
@@ -162,12 +181,15 @@ mod tests {
 
     #[test]
     fn some_tokens() {
-        let source = " my ( < != ";
+        let source = " my ( < != for\n #   forest \n1234  whiler";
         let mut tokens = Tokens::from(source);
         assert_eq!(tokens.next(), Some(Token::new(Kind::Identifier, "my")));
         assert_eq!(tokens.next(), Some(Token::new(Kind::LeftParen, "(")));
         assert_eq!(tokens.next(), Some(Token::new(Kind::Less, "<")));
         assert_eq!(tokens.next(), Some(Token::new(Kind::BangEqual, "!=")));
+        assert_eq!(tokens.next(), Some(Token::new(Kind::For, "for")));
+        assert_eq!(tokens.next(), Some(Token::new(Kind::Number, "1234")));
+        assert_eq!(tokens.next(), Some(Token::new(Kind::Identifier, "whiler")));
         assert_eq!(tokens.next(), None);
     }
 }
