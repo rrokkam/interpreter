@@ -2,13 +2,13 @@ use std::iter::Peekable;
 use std::str::Chars;
 
 #[derive(Debug, PartialEq, Eq)]
-struct Token<'a> {
+struct Token<'source> {
     kind: Kind,
-    text: &'a str,
+    text: &'source str,
 }
 
-impl<'a> Token<'a> {
-    fn new(kind: Kind, text: &'a str) -> Token<'a> {
+impl<'source> Token<'source> {
+    fn new(kind: Kind, text: &'source str) -> Token<'source> {
         Token { kind, text }
     }
 }
@@ -23,15 +23,15 @@ enum Kind {
     Error,
 }
 
-struct Tokens<'a> {
-    source: &'a str,
-    iter: Peekable<Chars<'a>>,
+struct Tokens<'source> {
+    source: &'source str,
+    iter: Peekable<Chars<'source>>,
     start: usize,
     current: usize,
 }
 
-impl<'a> From<&'a str> for Tokens<'a> {
-    fn from(source: &'a str) -> Tokens<'a> {
+impl<'source> From<&'source str> for Tokens<'source> {
+    fn from(source: &'source str) -> Tokens<'source> {
         let iter = source.chars().peekable();
         Tokens {
             source,
@@ -42,7 +42,7 @@ impl<'a> From<&'a str> for Tokens<'a> {
     }
 }
 
-impl<'a> Tokens<'a> {
+impl<'source> Tokens<'source> {
     fn advance(&mut self) -> Option<char> {
         let ch = self.iter.next();
 
@@ -132,9 +132,9 @@ impl<'a> Tokens<'a> {
     }
 }
 
-impl<'a> Iterator for Tokens<'a> {
-    type Item = Token<'a>;
-    fn next(&mut self) -> Option<Token<'a>> {
+impl<'source> Iterator for Tokens<'source> {
+    type Item = Token<'source>;
+    fn next(&mut self) -> Option<Token<'source>> {
         self.skip_whitespace_and_comments();
 
         let kind = match self.advance()? {
